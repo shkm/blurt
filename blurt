@@ -19,6 +19,10 @@ slugify() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
 }
 
+xml_escape() {
+    sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&apos;/g'
+}
+
 cmd_new() {
     open_editor=false
     [ "$1" = "-e" ] && open_editor=true && shift
@@ -103,6 +107,44 @@ cmd_build() {
     page_time="$(($(now_ms) - page_start))ms"
     sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/index.html"
     rm -f "$DIST/index.html.bak"
+
+    # Generate Atom feed
+    site_url=$(sed -n 's/^site_url: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+    site_title=$(sed -n 's/^site_title: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+    site_author=$(sed -n 's/^site_author: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+
+    if [ -n "$site_url" ]; then
+        feed_updated=$(echo "$sorted" | head -1 | cut -f1)
+        [ -z "$feed_updated" ] && feed_updated=$(date -u +%Y-%m-%d)
+        site_url_escaped=$(echo "$site_url" | xml_escape)
+
+        cat > "$DIST/feed.xml" << 'FEED_HEADER'
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+FEED_HEADER
+        printf '  <title>%s</title>\n' "$(echo "$site_title" | xml_escape)" >> "$DIST/feed.xml"
+        printf '  <link href="%s/feed.xml" rel="self"/>\n' "$site_url_escaped" >> "$DIST/feed.xml"
+        printf '  <link href="%s/"/>\n' "$site_url_escaped" >> "$DIST/feed.xml"
+        printf '  <id>%s/</id>\n' "$site_url_escaped" >> "$DIST/feed.xml"
+        printf '  <updated>%sT00:00:00Z</updated>\n' "$feed_updated" >> "$DIST/feed.xml"
+        [ -n "$site_author" ] && printf '  <author><name>%s</name></author>\n' "$(echo "$site_author" | xml_escape)" >> "$DIST/feed.xml"
+
+        echo "$sorted" | while IFS='	' read -r date slug title; do
+            [ -z "$date" ] && continue
+            article=$(sed -n '/<article>/,/<\/article>/p' "$DIST/$slug/index.html")
+            title_escaped=$(echo "$title" | xml_escape)
+            content_escaped=$(printf '%s' "$article" | xml_escape)
+            printf '  <entry>\n' >> "$DIST/feed.xml"
+            printf '    <title>%s</title>\n' "$title_escaped" >> "$DIST/feed.xml"
+            printf '    <link href="%s/%s/"/>\n' "$site_url_escaped" "$slug" >> "$DIST/feed.xml"
+            printf '    <id>%s/%s/</id>\n' "$site_url_escaped" "$slug" >> "$DIST/feed.xml"
+            printf '    <updated>%sT00:00:00Z</updated>\n' "$date" >> "$DIST/feed.xml"
+            printf '    <content type="html">%s</content>\n' "$content_escaped" >> "$DIST/feed.xml"
+            printf '  </entry>\n' >> "$DIST/feed.xml"
+        done
+
+        echo "</feed>" >> "$DIST/feed.xml"
+    fi
 
     # Replace commit SHA in all pages
     find "$DIST" -name '*.html' -exec sed -i.bak "s/__COMMIT_SHA__/$commit_sha/g" {} \;
