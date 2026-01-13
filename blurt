@@ -1,0 +1,136 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DIST="$SCRIPT_DIR/dist"
+
+slugify() {
+    echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
+}
+
+cmd_new() {
+    open_editor=false
+    [ "$1" = "-e" ] && open_editor=true && shift
+
+    title="$1"
+    if [ -z "$title" ]; then
+        echo "Usage: blurt new [-e] \"Post Title\""
+        exit 1
+    fi
+
+    slug=$(slugify "$title")
+    file="$SCRIPT_DIR/posts/$slug.md"
+
+    if [ -f "$file" ]; then
+        echo "File already exists: $file"
+        exit 1
+    fi
+
+    cat > "$file" << EOF
+---
+title: $title
+date: $(date -u +%Y-%m-%d)
+---
+
+EOF
+
+    echo "Created $file"
+    $open_editor && ${EDITOR:-vi} "$file"
+}
+
+cmd_build() {
+    if ! command -v pandoc &> /dev/null; then
+        echo "pandoc is required but not installed"
+        exit 1
+    fi
+
+    post_template="$SCRIPT_DIR/templates/post.html"
+    index_template="$SCRIPT_DIR/templates/index.html"
+    config_flag=""
+    [ -f "$SCRIPT_DIR/config.yaml" ] && config_flag="--metadata-file=$SCRIPT_DIR/config.yaml"
+
+    rm -rf "$DIST"
+    mkdir -p "$DIST"
+
+    if [ -d "$SCRIPT_DIR/static" ] && [ "$(ls -A "$SCRIPT_DIR/static" 2>/dev/null)" ]; then
+        cp -r "$SCRIPT_DIR/static"/* "$DIST/"
+    fi
+
+    posts_data=""
+
+    for post in "$SCRIPT_DIR/posts"/*.md; do
+        [ -f "$post" ] || continue
+
+        slug=$(basename "$post" .md)
+        title=$(sed -n 's/^title: *//p' "$post" | head -1)
+        date=$(sed -n 's/^date: *//p' "$post" | head -1)
+
+        mkdir -p "$DIST/$slug"
+        pandoc "$post" --template="$post_template" $config_flag -o "$DIST/$slug/index.html"
+
+        posts_data+="$date	$slug	$title"$'\n'
+    done
+
+    sorted=$(echo -n "$posts_data" | sort -r)
+    index_list=""
+
+    while IFS=$'\t' read -r date slug title; do
+        [ -z "$date" ] && continue
+        index_list+="<li><a href=\"$slug/\">$title</a> <time datetime=\"$date\">$date</time></li>"
+    done <<< "$sorted"
+
+    echo "$index_list" | pandoc --template="$index_template" $config_flag -o "$DIST/index.html"
+
+    echo "Built site in $DIST"
+}
+
+cmd_start() {
+    if ! command -v python3 &>/dev/null; then
+        echo "python3 is required for the dev server"
+        exit 1
+    fi
+
+    port="${1:-8000}"
+
+    cmd_build
+
+    python3 -m http.server "$port" -d "$DIST" &
+    server_pid=$!
+    trap "kill $server_pid 2>/dev/null" EXIT
+
+    echo "Serving at http://localhost:$port"
+
+    if command -v fswatch &>/dev/null; then
+        fswatch -o "$SCRIPT_DIR/posts" "$SCRIPT_DIR/templates" "$SCRIPT_DIR/static" "$SCRIPT_DIR/config.yaml" | while read; do
+            echo "Rebuilding..."
+            cmd_build
+        done
+    else
+        echo "Note: install fswatch for instant rebuilds (currently polling)"
+        while true; do
+            sleep 1
+            changed=$(find "$SCRIPT_DIR/posts" "$SCRIPT_DIR/templates" "$SCRIPT_DIR/static" "$SCRIPT_DIR/config.yaml" -newer "$DIST/index.html" 2>/dev/null | head -1)
+            [ -n "$changed" ] && echo "Rebuilding..." && cmd_build
+        done
+    fi
+}
+
+case "$1" in
+    new)
+        shift
+        cmd_new "$@"
+        ;;
+    build)
+        cmd_build
+        ;;
+    start)
+        cmd_start "$2"
+        ;;
+    *)
+        echo "Usage: blurt <new|build|start>"
+        echo "  new [-e] \"Title\"  - Create a new post"
+        echo "  build             - Build the site"
+        echo "  start [port]      - Watch, rebuild, and serve (default: 8000)"
+        exit 1
+        ;;
+esac
