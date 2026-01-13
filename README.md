@@ -95,3 +95,20 @@ Post content here.
 ```
 
 Output goes to `dist/my-post-title/index.html` for clean URLs.
+
+## Atom Feed
+
+An Atom feed is automatically generated at `dist/feed.xml` when `site_url` is configured in `config.yaml`. The feed includes the full HTML content of each post.
+
+Required config:
+
+```yaml
+site_url: "https://example.com"
+```
+
+Optional config for the feed:
+
+```yaml
+site_title: "My Blog"
+site_author: "Your Name"
+```
