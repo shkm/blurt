@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+VERSION="1.0.0"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
 
@@ -173,9 +175,17 @@ cmd_update() {
         exit 1
     fi
 
+    remote_version=$(grep '^VERSION=' "$tmp_file" | head -1 | cut -d'"' -f2)
+    [ -z "$remote_version" ] && remote_version="unknown"
+
+    if [ "$VERSION" = "$remote_version" ]; then
+        echo "Already at latest version ($VERSION)"
+        exit 0
+    fi
+
     cp "$tmp_file" "$0"
     chmod +x "$0"
-    echo "Updated blurt to latest version"
+    echo "Updated blurt from $VERSION to $remote_version"
 }
 
 cmd_start() {
@@ -223,12 +233,16 @@ case "$1" in
     update)
         cmd_update
         ;;
+    version|-v|--version)
+        echo "blurt $VERSION"
+        ;;
     *)
-        echo "Usage: blurt <new|build|start|update>"
+        echo "Usage: blurt <new|build|start|update|version>"
         echo "  new [-e] \"Title\"  - Create a new post"
         echo "  build             - Build the site"
         echo "  start [port]      - Watch, rebuild, and serve (default: 8000)"
         echo "  update            - Update blurt to latest version"
+        echo "  version           - Show version number"
         exit 1
         ;;
 esac

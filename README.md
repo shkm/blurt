@@ -37,6 +37,9 @@ That's it!
 
 # Update to the latest version
 ./blurt update
+
+# Show version
+./blurt version
 ```
 
 ## Structure
