@@ -72,7 +72,7 @@ cmd_build() {
 "
     done
 
-    sorted=$(echo -n "$posts_data" | sort -r)
+    sorted=$(printf '%s' "$posts_data" | sort -r)
 
     index_list=$(echo "$sorted" | while IFS='	' read -r date slug title; do
         [ -z "$date" ] && continue
