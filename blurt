@@ -4,6 +4,17 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
 
+# Get current time in milliseconds (portable across GNU, BusyBox, macOS)
+now_ms() {
+    if ts=$(date +%s%N 2>/dev/null) && [ ${#ts} -gt 10 ]; then
+        echo $((ts / 1000000))
+    elif [ -f /proc/uptime ]; then
+        awk '{printf "%.0f", $1 * 1000}' /proc/uptime
+    else
+        echo $(($(date +%s) * 1000))
+    fi
+}
+
 slugify() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
 }
@@ -44,7 +55,7 @@ cmd_build() {
         exit 1
     fi
 
-    build_start=$(date +%s%N 2>/dev/null || date +%s)
+    build_start=$(now_ms)
     commit_sha="${GITHUB_SHA:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}"
 
     post_template="$SCRIPT_DIR/templates/post.html"
@@ -70,15 +81,9 @@ cmd_build() {
         date=$(sed -n 's/^date: *//p' "$post" | head -1)
 
         mkdir -p "$DIST/$slug"
-        page_start=$(date +%s%N 2>/dev/null || date +%s)
+        page_start=$(now_ms)
         pandoc "$post" --template="$post_template" $data_dir $config_flag -o "$DIST/$slug/index.html"
-        page_end=$(date +%s%N 2>/dev/null || date +%s)
-        if [ ${#page_start} -gt 10 ]; then
-            page_ms=$(( (page_end - page_start) / 1000000 ))
-            page_time="${page_ms}ms"
-        else
-            page_time="$((page_end - page_start))s"
-        fi
+        page_time="$(($(now_ms) - page_start))ms"
         sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/$slug/index.html"
         rm -f "$DIST/$slug/index.html.bak"
 
@@ -93,15 +98,9 @@ cmd_build() {
         printf '<li><a href="%s/">%s</a> <time datetime="%s">%s</time></li>' "$slug" "$title" "$date" "$date"
     done)
 
-    page_start=$(date +%s%N 2>/dev/null || date +%s)
+    page_start=$(now_ms)
     echo "$index_list" | pandoc --template="$index_template" $data_dir $config_flag -o "$DIST/index.html"
-    page_end=$(date +%s%N 2>/dev/null || date +%s)
-    if [ ${#page_start} -gt 10 ]; then
-        page_ms=$(( (page_end - page_start) / 1000000 ))
-        page_time="${page_ms}ms"
-    else
-        page_time="$((page_end - page_start))s"
-    fi
+    page_time="$(($(now_ms) - page_start))ms"
     sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/index.html"
     rm -f "$DIST/index.html.bak"
 
@@ -109,16 +108,7 @@ cmd_build() {
     find "$DIST" -name '*.html' -exec sed -i.bak "s/__COMMIT_SHA__/$commit_sha/g" {} \;
     find "$DIST" -name '*.bak' -delete
 
-    # Calculate total build time
-    build_end=$(date +%s%N 2>/dev/null || date +%s)
-    if [ ${#build_start} -gt 10 ]; then
-        build_ms=$(( (build_end - build_start) / 1000000 ))
-        build_time="${build_ms}ms"
-    else
-        build_time="$((build_end - build_start))s"
-    fi
-
-    echo "Built site in $DIST (${build_time})"
+    echo "Built site in $DIST ($(($(now_ms) - build_start))ms)"
 }
 
 cmd_start() {
