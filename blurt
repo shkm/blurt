@@ -153,6 +153,31 @@ FEED_HEADER
     echo "Built site in $DIST ($(($(now_ms) - build_start))ms)"
 }
 
+cmd_update() {
+    remote_url="https://raw.githubusercontent.com/shkm/blurt/main/blurt"
+    tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" EXIT
+
+    echo "Fetching latest version..."
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$remote_url" -o "$tmp_file"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO "$tmp_file" "$remote_url"
+    else
+        echo "curl or wget is required for update"
+        exit 1
+    fi
+
+    if [ ! -s "$tmp_file" ] || ! head -1 "$tmp_file" | grep -q '^#!/bin/sh'; then
+        echo "Failed to download valid script"
+        exit 1
+    fi
+
+    cp "$tmp_file" "$0"
+    chmod +x "$0"
+    echo "Updated blurt to latest version"
+}
+
 cmd_start() {
     if ! command -v python3 >/dev/null 2>&1; then
         echo "python3 is required for the dev server"
@@ -195,11 +220,15 @@ case "$1" in
     start)
         cmd_start "$2"
         ;;
+    update)
+        cmd_update
+        ;;
     *)
-        echo "Usage: blurt <new|build|start>"
+        echo "Usage: blurt <new|build|start|update>"
         echo "  new [-e] \"Title\"  - Create a new post"
         echo "  build             - Build the site"
         echo "  start [port]      - Watch, rebuild, and serve (default: 8000)"
+        echo "  update            - Update blurt to latest version"
         exit 1
         ;;
 esac

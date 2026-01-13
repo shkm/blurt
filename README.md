@@ -18,6 +18,7 @@ That's it!
 - **pandoc** - for the actual heavy lifting
 - **python3** (optional) - for the dev server (`start` command)
 - **fswatch** (optional) - for instant rebuilds during development
+- **curl** or **wget** (optional) - for self-updating
 
 ## Usage
 
@@ -33,6 +34,9 @@ That's it!
 
 # Watch, rebuild, and serve at http://localhost:8000
 ./blurt start
+
+# Update to the latest version
+./blurt update
 ```
 
 ## Structure
