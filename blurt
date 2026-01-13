@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -35,11 +35,11 @@ date: $(date -u +%Y-%m-%d)
 EOF
 
     echo "Created $file"
-    $open_editor && ${EDITOR:-vi} "$file"
+    if $open_editor; then ${EDITOR:-vi} "$file"; fi
 }
 
 cmd_build() {
-    if ! command -v pandoc &> /dev/null; then
+    if ! command -v pandoc >/dev/null 2>&1; then
         echo "pandoc is required but not installed"
         exit 1
     fi
@@ -68,16 +68,16 @@ cmd_build() {
         mkdir -p "$DIST/$slug"
         pandoc "$post" --template="$post_template" $config_flag -o "$DIST/$slug/index.html"
 
-        posts_data+="$date	$slug	$title"$'\n'
+        posts_data="$posts_data$date	$slug	$title
+"
     done
 
     sorted=$(echo -n "$posts_data" | sort -r)
-    index_list=""
 
-    while IFS=$'\t' read -r date slug title; do
+    index_list=$(echo "$sorted" | while IFS='	' read -r date slug title; do
         [ -z "$date" ] && continue
-        index_list+="<li><a href=\"$slug/\">$title</a> <time datetime=\"$date\">$date</time></li>"
-    done <<< "$sorted"
+        printf '<li><a href="%s/">%s</a> <time datetime="%s">%s</time></li>' "$slug" "$title" "$date" "$date"
+    done)
 
     echo "$index_list" | pandoc --template="$index_template" $config_flag -o "$DIST/index.html"
 
@@ -85,7 +85,7 @@ cmd_build() {
 }
 
 cmd_start() {
-    if ! command -v python3 &>/dev/null; then
+    if ! command -v python3 >/dev/null 2>&1; then
         echo "python3 is required for the dev server"
         exit 1
     fi
@@ -100,7 +100,7 @@ cmd_start() {
 
     echo "Serving at http://localhost:$port"
 
-    if command -v fswatch &>/dev/null; then
+    if command -v fswatch >/dev/null 2>&1; then
         fswatch -o "$SCRIPT_DIR/posts" "$SCRIPT_DIR/templates" "$SCRIPT_DIR/static" "$SCRIPT_DIR/config.yaml" | while read; do
             echo "Rebuilding..."
             cmd_build
