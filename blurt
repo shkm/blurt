@@ -1,49 +1,49 @@
 #!/bin/sh
 set -e
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
 
 # Get current time in milliseconds (portable across GNU, BusyBox, macOS)
 now_ms() {
-    if ts=$(date +%s%N 2>/dev/null) && [ ${#ts} -gt 10 ]; then
-        echo $((ts / 1000000))
-    elif [ -f /proc/uptime ]; then
-        awk '{printf "%.0f", $1 * 1000}' /proc/uptime
-    else
-        echo $(($(date +%s) * 1000))
-    fi
+  if ts=$(date +%s%N 2>/dev/null) && [ ${#ts} -gt 10 ]; then
+    echo $((ts / 1000000))
+  elif [ -f /proc/uptime ]; then
+    awk '{printf "%.0f", $1 * 1000}' /proc/uptime
+  else
+    echo $(($(date +%s) * 1000))
+  fi
 }
 
 slugify() {
-    echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
+  echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
 }
 
 xml_escape() {
-    sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&apos;/g'
+  sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&apos;/g'
 }
 
 cmd_new() {
-    open_editor=false
-    [ "$1" = "-e" ] && open_editor=true && shift
+  open_editor=false
+  [ "$1" = "-e" ] && open_editor=true && shift
 
-    title="$1"
-    if [ -z "$title" ]; then
-        echo "Usage: blurt new [-e] \"Post Title\""
-        exit 1
-    fi
+  title="$1"
+  if [ -z "$title" ]; then
+    echo "Usage: blurt new [-e] \"Post Title\""
+    exit 1
+  fi
 
-    slug=$(slugify "$title")
-    file="$SCRIPT_DIR/posts/$slug.md"
+  slug=$(slugify "$title")
+  file="$SCRIPT_DIR/posts/$slug.md"
 
-    if [ -f "$file" ]; then
-        echo "File already exists: $file"
-        exit 1
-    fi
+  if [ -f "$file" ]; then
+    echo "File already exists: $file"
+    exit 1
+  fi
 
-    cat > "$file" << EOF
+  cat >"$file" <<EOF
 ---
 title: $title
 date: $(date -u +%Y-%m-%d)
@@ -51,198 +51,198 @@ date: $(date -u +%Y-%m-%d)
 
 EOF
 
-    echo "Created $file"
-    if $open_editor; then ${EDITOR:-vi} "$file"; fi
+  echo "Created $file"
+  if $open_editor; then ${EDITOR:-vi} "$file"; fi
 }
 
 cmd_build() {
-    if ! command -v pandoc >/dev/null 2>&1; then
-        echo "pandoc is required but not installed"
-        exit 1
-    fi
+  if ! command -v pandoc >/dev/null 2>&1; then
+    echo "pandoc is required but not installed"
+    exit 1
+  fi
 
-    build_start=$(now_ms)
-    commit_sha="${GITHUB_SHA:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}"
+  build_start=$(now_ms)
+  commit_sha="${GITHUB_SHA:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}"
 
-    post_template="$SCRIPT_DIR/templates/post.html"
-    index_template="$SCRIPT_DIR/templates/index.html"
-    data_dir="--data-dir=$SCRIPT_DIR"
-    config_flag=""
-    [ -f "$SCRIPT_DIR/config.yaml" ] && config_flag="--metadata-file=$SCRIPT_DIR/config.yaml"
+  post_template="$SCRIPT_DIR/templates/post.html"
+  index_template="$SCRIPT_DIR/templates/index.html"
+  data_dir="--data-dir=$SCRIPT_DIR"
+  config_flag=""
+  [ -f "$SCRIPT_DIR/config.yaml" ] && config_flag="--metadata-file=$SCRIPT_DIR/config.yaml"
 
-    rm -rf "$DIST"
-    mkdir -p "$DIST"
+  rm -rf "$DIST"
+  mkdir -p "$DIST"
 
-    if [ -d "$SCRIPT_DIR/static" ] && [ "$(ls -A "$SCRIPT_DIR/static" 2>/dev/null)" ]; then
-        cp -r "$SCRIPT_DIR/static"/* "$DIST/"
-    fi
+  if [ -d "$SCRIPT_DIR/static" ] && [ "$(ls -A "$SCRIPT_DIR/static" 2>/dev/null)" ]; then
+    cp -r "$SCRIPT_DIR/static"/* "$DIST/"
+  fi
 
-    posts_data=""
+  posts_data=""
 
-    for post in "$SCRIPT_DIR/posts"/*.md; do
-        [ -f "$post" ] || continue
+  for post in "$SCRIPT_DIR/posts"/*.md; do
+    [ -f "$post" ] || continue
 
-        slug=$(basename "$post" .md)
-        title=$(sed -n 's/^title: *//p' "$post" | head -1)
-        date=$(sed -n 's/^date: *//p' "$post" | head -1)
+    slug=$(basename "$post" .md)
+    title=$(sed -n 's/^title: *//p' "$post" | head -1)
+    date=$(sed -n 's/^date: *//p' "$post" | head -1)
 
-        mkdir -p "$DIST/$slug"
-        page_start=$(now_ms)
-        pandoc "$post" --template="$post_template" $data_dir $config_flag -o "$DIST/$slug/index.html"
-        page_time="$(($(now_ms) - page_start))ms"
-        sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/$slug/index.html"
-        rm -f "$DIST/$slug/index.html.bak"
-
-        posts_data="$posts_data$date	$slug	$title
-"
-    done
-
-    sorted=$(printf '%s' "$posts_data" | sort -r)
-
-    index_list=$(echo "$sorted" | while IFS='	' read -r date slug title; do
-        [ -z "$date" ] && continue
-        printf '<li><a href="%s/">%s</a> <time datetime="%s">%s</time></li>' "$slug" "$title" "$date" "$date"
-    done)
-
+    mkdir -p "$DIST/$slug"
     page_start=$(now_ms)
-    echo "$index_list" | pandoc --template="$index_template" $data_dir $config_flag -o "$DIST/index.html"
+    pandoc "$post" --template="$post_template" $data_dir $config_flag -o "$DIST/$slug/index.html"
     page_time="$(($(now_ms) - page_start))ms"
-    sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/index.html"
-    rm -f "$DIST/index.html.bak"
+    sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/$slug/index.html"
+    rm -f "$DIST/$slug/index.html.bak"
 
-    # Generate Atom feed
-    site_url=$(sed -n 's/^site_url: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
-    site_title=$(sed -n 's/^site_title: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
-    site_author=$(sed -n 's/^site_author: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+    posts_data="$posts_data$date	$slug	$title
+"
+  done
 
-    if [ -n "$site_url" ]; then
-        feed_updated=$(echo "$sorted" | head -1 | cut -f1)
-        [ -z "$feed_updated" ] && feed_updated=$(date -u +%Y-%m-%d)
-        site_url_escaped=$(echo "$site_url" | xml_escape)
+  sorted=$(printf '%s' "$posts_data" | sort -r)
 
-        cat > "$DIST/feed.xml" << 'FEED_HEADER'
+  index_list=$(echo "$sorted" | while IFS='	' read -r date slug title; do
+    [ -z "$date" ] && continue
+    printf '<li><a href="%s/">%s</a> <time datetime="%s">%s</time></li>' "$slug" "$title" "$date" "$date"
+  done)
+
+  page_start=$(now_ms)
+  echo "$index_list" | pandoc --template="$index_template" $data_dir $config_flag -o "$DIST/index.html"
+  page_time="$(($(now_ms) - page_start))ms"
+  sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/index.html"
+  rm -f "$DIST/index.html.bak"
+
+  # Generate Atom feed
+  site_url=$(sed -n 's/^site_url: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+  site_title=$(sed -n 's/^site_title: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+  site_author=$(sed -n 's/^site_author: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+
+  if [ -n "$site_url" ]; then
+    feed_updated=$(echo "$sorted" | head -1 | cut -f1)
+    [ -z "$feed_updated" ] && feed_updated=$(date -u +%Y-%m-%d)
+    site_url_escaped=$(echo "$site_url" | xml_escape)
+
+    cat >"$DIST/feed.xml" <<'FEED_HEADER'
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
 FEED_HEADER
-        printf '  <title>%s</title>\n' "$(echo "$site_title" | xml_escape)" >> "$DIST/feed.xml"
-        printf '  <link href="%s/feed.xml" rel="self"/>\n' "$site_url_escaped" >> "$DIST/feed.xml"
-        printf '  <link href="%s/"/>\n' "$site_url_escaped" >> "$DIST/feed.xml"
-        printf '  <id>%s/</id>\n' "$site_url_escaped" >> "$DIST/feed.xml"
-        printf '  <updated>%sT00:00:00Z</updated>\n' "$feed_updated" >> "$DIST/feed.xml"
-        [ -n "$site_author" ] && printf '  <author><name>%s</name></author>\n' "$(echo "$site_author" | xml_escape)" >> "$DIST/feed.xml"
+    printf '  <title>%s</title>\n' "$(echo "$site_title" | xml_escape)" >>"$DIST/feed.xml"
+    printf '  <link href="%s/feed.xml" rel="self"/>\n' "$site_url_escaped" >>"$DIST/feed.xml"
+    printf '  <link href="%s/"/>\n' "$site_url_escaped" >>"$DIST/feed.xml"
+    printf '  <id>%s/</id>\n' "$site_url_escaped" >>"$DIST/feed.xml"
+    printf '  <updated>%sT00:00:00Z</updated>\n' "$feed_updated" >>"$DIST/feed.xml"
+    [ -n "$site_author" ] && printf '  <author><name>%s</name></author>\n' "$(echo "$site_author" | xml_escape)" >>"$DIST/feed.xml"
 
-        echo "$sorted" | while IFS='	' read -r date slug title; do
-            [ -z "$date" ] && continue
-            article=$(sed -n '/<article>/,/<\/article>/p' "$DIST/$slug/index.html")
-            title_escaped=$(echo "$title" | xml_escape)
-            content_escaped=$(printf '%s' "$article" | xml_escape)
-            printf '  <entry>\n' >> "$DIST/feed.xml"
-            printf '    <title>%s</title>\n' "$title_escaped" >> "$DIST/feed.xml"
-            printf '    <link href="%s/%s/"/>\n' "$site_url_escaped" "$slug" >> "$DIST/feed.xml"
-            printf '    <id>%s/%s/</id>\n' "$site_url_escaped" "$slug" >> "$DIST/feed.xml"
-            printf '    <updated>%sT00:00:00Z</updated>\n' "$date" >> "$DIST/feed.xml"
-            printf '    <content type="html">%s</content>\n' "$content_escaped" >> "$DIST/feed.xml"
-            printf '  </entry>\n' >> "$DIST/feed.xml"
-        done
+    echo "$sorted" | while IFS='	' read -r date slug title; do
+      [ -z "$date" ] && continue
+      article=$(sed -n '/<article>/,/<\/article>/p' "$DIST/$slug/index.html")
+      title_escaped=$(echo "$title" | xml_escape)
+      content_escaped=$(printf '%s' "$article" | xml_escape)
+      printf '  <entry>\n' >>"$DIST/feed.xml"
+      printf '    <title>%s</title>\n' "$title_escaped" >>"$DIST/feed.xml"
+      printf '    <link href="%s/%s/"/>\n' "$site_url_escaped" "$slug" >>"$DIST/feed.xml"
+      printf '    <id>%s/%s/</id>\n' "$site_url_escaped" "$slug" >>"$DIST/feed.xml"
+      printf '    <updated>%sT00:00:00Z</updated>\n' "$date" >>"$DIST/feed.xml"
+      printf '    <content type="html">%s</content>\n' "$content_escaped" >>"$DIST/feed.xml"
+      printf '  </entry>\n' >>"$DIST/feed.xml"
+    done
 
-        echo "</feed>" >> "$DIST/feed.xml"
-    fi
+    echo "</feed>" >>"$DIST/feed.xml"
+  fi
 
-    # Replace commit SHA in all pages
-    find "$DIST" -name '*.html' -exec sed -i.bak "s/__COMMIT_SHA__/$commit_sha/g" {} \;
-    find "$DIST" -name '*.bak' -delete
+  # Replace commit SHA in all pages
+  find "$DIST" -name '*.html' -exec sed -i.bak "s/__COMMIT_SHA__/$commit_sha/g" {} \;
+  find "$DIST" -name '*.bak' -delete
 
-    echo "Built site in $DIST ($(($(now_ms) - build_start))ms)"
+  echo "Built site in $DIST ($(($(now_ms) - build_start))ms)"
 }
 
 cmd_update() {
-    remote_url="https://raw.githubusercontent.com/shkm/blurt/main/blurt"
-    tmp_file=$(mktemp)
-    trap "rm -f '$tmp_file'" EXIT
+  remote_url="https://raw.githubusercontent.com/shkm/blurt/refs/heads/main/blurt"
+  tmp_file=$(mktemp)
+  trap "rm -f '$tmp_file'" EXIT
 
-    echo "Fetching latest version..."
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$remote_url" -o "$tmp_file"
-    elif command -v wget >/dev/null 2>&1; then
-        wget -qO "$tmp_file" "$remote_url"
-    else
-        echo "curl or wget is required for update"
-        exit 1
-    fi
+  echo "Fetching latest version..."
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$remote_url" -o "$tmp_file"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$tmp_file" "$remote_url"
+  else
+    echo "curl or wget is required for update"
+    exit 1
+  fi
 
-    if [ ! -s "$tmp_file" ] || ! head -1 "$tmp_file" | grep -q '^#!/bin/sh'; then
-        echo "Failed to download valid script"
-        exit 1
-    fi
+  if [ ! -s "$tmp_file" ] || ! head -1 "$tmp_file" | grep -q '^#!/bin/sh'; then
+    echo "Failed to download valid script"
+    exit 1
+  fi
 
-    remote_version=$(grep '^VERSION=' "$tmp_file" | head -1 | cut -d'"' -f2)
-    [ -z "$remote_version" ] && remote_version="unknown"
+  remote_version=$(grep '^VERSION=' "$tmp_file" | head -1 | cut -d'"' -f2)
+  [ -z "$remote_version" ] && remote_version="unknown"
 
-    if [ "$VERSION" = "$remote_version" ]; then
-        echo "Already at latest version ($VERSION)"
-        exit 0
-    fi
+  if [ "$VERSION" = "$remote_version" ]; then
+    echo "Already at latest version ($VERSION)"
+    exit 0
+  fi
 
-    cp "$tmp_file" "$0"
-    chmod +x "$0"
-    echo "Updated blurt from $VERSION to $remote_version"
+  cp "$tmp_file" "$0"
+  chmod +x "$0"
+  echo "Updated blurt from $VERSION to $remote_version"
 }
 
 cmd_start() {
-    if ! command -v python3 >/dev/null 2>&1; then
-        echo "python3 is required for the dev server"
-        exit 1
-    fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "python3 is required for the dev server"
+    exit 1
+  fi
 
-    port="${1:-8000}"
+  port="${1:-8000}"
 
-    cmd_build
+  cmd_build
 
-    python3 -m http.server "$port" -d "$DIST" &
-    server_pid=$!
-    trap "kill $server_pid 2>/dev/null" EXIT
+  python3 -m http.server "$port" -d "$DIST" &
+  server_pid=$!
+  trap "kill $server_pid 2>/dev/null" EXIT
 
-    echo "Serving at http://localhost:$port"
+  echo "Serving at http://localhost:$port"
 
-    if command -v fswatch >/dev/null 2>&1; then
-        fswatch -o "$SCRIPT_DIR/posts" "$SCRIPT_DIR/templates" "$SCRIPT_DIR/static" "$SCRIPT_DIR/config.yaml" | while read; do
-            echo "Rebuilding..."
-            cmd_build
-        done
-    else
-        echo "Note: install fswatch for instant rebuilds (currently polling)"
-        while true; do
-            sleep 1
-            changed=$(find "$SCRIPT_DIR/posts" "$SCRIPT_DIR/templates" "$SCRIPT_DIR/static" "$SCRIPT_DIR/config.yaml" -newer "$DIST/index.html" 2>/dev/null | head -1)
-            [ -n "$changed" ] && echo "Rebuilding..." && cmd_build
-        done
-    fi
+  if command -v fswatch >/dev/null 2>&1; then
+    fswatch -o "$SCRIPT_DIR/posts" "$SCRIPT_DIR/templates" "$SCRIPT_DIR/static" "$SCRIPT_DIR/config.yaml" | while read; do
+      echo "Rebuilding..."
+      cmd_build
+    done
+  else
+    echo "Note: install fswatch for instant rebuilds (currently polling)"
+    while true; do
+      sleep 1
+      changed=$(find "$SCRIPT_DIR/posts" "$SCRIPT_DIR/templates" "$SCRIPT_DIR/static" "$SCRIPT_DIR/config.yaml" -newer "$DIST/index.html" 2>/dev/null | head -1)
+      [ -n "$changed" ] && echo "Rebuilding..." && cmd_build
+    done
+  fi
 }
 
 case "$1" in
-    new)
-        shift
-        cmd_new "$@"
-        ;;
-    build)
-        cmd_build
-        ;;
-    start)
-        cmd_start "$2"
-        ;;
-    update)
-        cmd_update
-        ;;
-    version|-v|--version)
-        echo "blurt $VERSION"
-        ;;
-    *)
-        echo "Usage: blurt <new|build|start|update|version>"
-        echo "  new [-e] \"Title\"  - Create a new post"
-        echo "  build             - Build the site"
-        echo "  start [port]      - Watch, rebuild, and serve (default: 8000)"
-        echo "  update            - Update blurt to latest version"
-        echo "  version           - Show version number"
-        exit 1
-        ;;
+new)
+  shift
+  cmd_new "$@"
+  ;;
+build)
+  cmd_build
+  ;;
+start)
+  cmd_start "$2"
+  ;;
+update)
+  cmd_update
+  ;;
+version | -v | --version)
+  echo "blurt $VERSION"
+  ;;
+*)
+  echo "Usage: blurt <new|build|start|update|version>"
+  echo "  new [-e] \"Title\"  - Create a new post"
+  echo "  build             - Build the site"
+  echo "  start [port]      - Watch, rebuild, and serve (default: 8000)"
+  echo "  update            - Update blurt to latest version"
+  echo "  version           - Show version number"
+  exit 1
+  ;;
 esac
