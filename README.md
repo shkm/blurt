@@ -75,6 +75,7 @@ The following placeholders are replaced at build time:
 
 - `__BUILD_TIME__` - Time taken to build that specific page (e.g., `42ms`)
 - `__COMMIT_SHA__` - Short git commit hash, uses `GITHUB_SHA` env var if available
+- `__BLURT_VERSION__` - Blurt version number (e.g., `1.0.1`)
 
 Example usage in a template:
 

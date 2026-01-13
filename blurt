@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-VERSION="1.0.1"
+VERSION="1.1.0"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
@@ -148,8 +148,8 @@ FEED_HEADER
     echo "</feed>" >>"$DIST/feed.xml"
   fi
 
-  # Replace commit SHA in all pages
-  find "$DIST" -name '*.html' -exec sed -i.bak "s/__COMMIT_SHA__/$commit_sha/g" {} \;
+  # Replace variables in all pages
+  find "$DIST" -name '*.html' -exec sed -i.bak "s/__COMMIT_SHA__/$commit_sha/g; s/__BLURT_VERSION__/$VERSION/g" {} \;
   find "$DIST" -name '*.bak' -delete
 
   echo "Built site in $DIST ($(($(now_ms) - build_start))ms)"
