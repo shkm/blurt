@@ -44,6 +44,9 @@ cmd_build() {
         exit 1
     fi
 
+    build_start=$(date +%s%N 2>/dev/null || date +%s)
+    commit_sha="${GITHUB_SHA:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}"
+
     post_template="$SCRIPT_DIR/templates/post.html"
     index_template="$SCRIPT_DIR/templates/index.html"
     data_dir="--data-dir=$SCRIPT_DIR"
@@ -67,7 +70,17 @@ cmd_build() {
         date=$(sed -n 's/^date: *//p' "$post" | head -1)
 
         mkdir -p "$DIST/$slug"
+        page_start=$(date +%s%N 2>/dev/null || date +%s)
         pandoc "$post" --template="$post_template" $data_dir $config_flag -o "$DIST/$slug/index.html"
+        page_end=$(date +%s%N 2>/dev/null || date +%s)
+        if [ ${#page_start} -gt 10 ]; then
+            page_ms=$(( (page_end - page_start) / 1000000 ))
+            page_time="${page_ms}ms"
+        else
+            page_time="$((page_end - page_start))s"
+        fi
+        sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/$slug/index.html"
+        rm -f "$DIST/$slug/index.html.bak"
 
         posts_data="$posts_data$date	$slug	$title
 "
@@ -80,9 +93,32 @@ cmd_build() {
         printf '<li><a href="%s/">%s</a> <time datetime="%s">%s</time></li>' "$slug" "$title" "$date" "$date"
     done)
 
+    page_start=$(date +%s%N 2>/dev/null || date +%s)
     echo "$index_list" | pandoc --template="$index_template" $data_dir $config_flag -o "$DIST/index.html"
+    page_end=$(date +%s%N 2>/dev/null || date +%s)
+    if [ ${#page_start} -gt 10 ]; then
+        page_ms=$(( (page_end - page_start) / 1000000 ))
+        page_time="${page_ms}ms"
+    else
+        page_time="$((page_end - page_start))s"
+    fi
+    sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/index.html"
+    rm -f "$DIST/index.html.bak"
 
-    echo "Built site in $DIST"
+    # Replace commit SHA in all pages
+    find "$DIST" -name '*.html' -exec sed -i.bak "s/__COMMIT_SHA__/$commit_sha/g" {} \;
+    find "$DIST" -name '*.bak' -delete
+
+    # Calculate total build time
+    build_end=$(date +%s%N 2>/dev/null || date +%s)
+    if [ ${#build_start} -gt 10 ]; then
+        build_ms=$(( (build_end - build_start) / 1000000 ))
+        build_time="${build_ms}ms"
+    else
+        build_time="$((build_end - build_start))s"
+    fi
+
+    echo "Built site in $DIST (${build_time})"
 }
 
 cmd_start() {

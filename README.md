@@ -38,11 +38,12 @@ That's it!
 ## Structure
 
 ```
-├── blurt         # CLI
+├── blurt             # CLI
 ├── config.yaml       # Settings
 ├── templates/
 │   ├── index.html    # Index page template
-│   └── post.html     # Post page template
+│   ├── post.html     # Post page template
+│   └── *.html        # Partials (optional)
 ├── static/           # Static files (copied to dist/)
 ├── posts/            # Markdown posts
 └── dist/             # Generated site
@@ -60,6 +61,21 @@ Templates use pandoc's variable syntax:
 ## Partials
 
 You can create reusable template snippets in `templates/`. For example, `templates/footer.html` can be included in other templates with `$footer()$`.
+
+## Placeholders
+
+The following placeholders are replaced at build time:
+
+- `__BUILD_TIME__` - Time taken to build that specific page (e.g., `42ms`)
+- `__COMMIT_SHA__` - Short git commit hash, uses `GITHUB_SHA` env var if available
+
+Example usage in a template:
+
+```html
+<footer>
+  <p>Built in __BUILD_TIME__ · <a href="https://github.com/you/repo/commit/__COMMIT_SHA__">__COMMIT_SHA__</a></p>
+</footer>
+```
 
 ## Posts
 
