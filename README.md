@@ -57,6 +57,10 @@ Templates use pandoc's variable syntax:
 - `$date$` - post date from frontmatter
 - `$body$` - converted markdown content
 
+## Partials
+
+You can create reusable template snippets in `templates/`. For example, `templates/footer.html` can be included in other templates with `$footer()$`.
+
 ## Posts
 
 Posts are markdown files with YAML frontmatter:

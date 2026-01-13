@@ -46,6 +46,7 @@ cmd_build() {
 
     post_template="$SCRIPT_DIR/templates/post.html"
     index_template="$SCRIPT_DIR/templates/index.html"
+    data_dir="--data-dir=$SCRIPT_DIR"
     config_flag=""
     [ -f "$SCRIPT_DIR/config.yaml" ] && config_flag="--metadata-file=$SCRIPT_DIR/config.yaml"
 
@@ -66,7 +67,7 @@ cmd_build() {
         date=$(sed -n 's/^date: *//p' "$post" | head -1)
 
         mkdir -p "$DIST/$slug"
-        pandoc "$post" --template="$post_template" $config_flag -o "$DIST/$slug/index.html"
+        pandoc "$post" --template="$post_template" $data_dir $config_flag -o "$DIST/$slug/index.html"
 
         posts_data="$posts_data$date	$slug	$title
 "
@@ -79,7 +80,7 @@ cmd_build() {
         printf '<li><a href="%s/">%s</a> <time datetime="%s">%s</time></li>' "$slug" "$title" "$date" "$date"
     done)
 
-    echo "$index_list" | pandoc --template="$index_template" $config_flag -o "$DIST/index.html"
+    echo "$index_list" | pandoc --template="$index_template" $data_dir $config_flag -o "$DIST/index.html"
 
     echo "Built site in $DIST"
 }
