@@ -121,7 +121,7 @@ site_author: "Your Name"
 
 ## OpenGraph Images
 
-When ImageMagick is installed, blurt automatically generates OpenGraph images for social sharing. Images are created at:
+When ImageMagick is installed, blurt automatically generates OpenGraph images for social sharing. Requires the [Open Sans](https://fonts.google.com/specimen/Open+Sans) font to be installed. Images are created at:
 
 - `dist/og.jpg` - for the index page
 - `dist/<post>/og.jpg` - for each post
