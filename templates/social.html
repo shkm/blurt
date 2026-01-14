@@ -1,0 +1,12 @@
+  <meta property="og:title" content="$pagetitle$">
+  <meta property="og:type" content="$if(is_post)$article$else$website$endif$">
+  <meta property="og:url" content="$site_url$/$if(slug)$$slug$/$endif$">
+  <meta property="og:site_name" content="$site_title$">
+  <meta property="og:image" content="$site_url$/$if(slug)$$slug$/$endif$og.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+$if(pagedescription)$
+  <meta property="og:description" content="$pagedescription$">
+$endif$
+  <meta name="twitter:card" content="summary_large_image">

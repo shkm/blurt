@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
@@ -23,6 +23,31 @@ slugify() {
 
 xml_escape() {
   sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&apos;/g'
+}
+
+generate_og_image() {
+  title="$1"
+  description="$2"
+  output="$3"
+
+  [ ! command -v magick ] >/dev/null 2>&1 && return
+
+  if [ -n "$description" ]; then
+    magick -size 1200x630 gradient:'#ffffff-#c8c8c8' \
+      \( -font "Helvetica-Bold" -pointsize 64 -fill '#111111' \
+      -size 1000x -background none -gravity center caption:"$title" \) \
+      -gravity center -geometry +0-20 -composite \
+      \( -font "Helvetica" -pointsize 22 -fill '#555555' \
+      -size 900x -background none -gravity center caption:"$description" \) \
+      -gravity center -geometry +0+45 -composite \
+      -quality 90 "$output"
+  else
+    magick -size 1200x630 gradient:'#ffffff-#c8c8c8' \
+      \( -font "Helvetica-Bold" -pointsize 72 -fill '#111111' \
+      -size 1000x -background none -gravity center caption:"$title" \) \
+      -gravity center -composite \
+      -quality 90 "$output"
+  fi
 }
 
 cmd_new() {
@@ -85,13 +110,16 @@ cmd_build() {
     slug=$(basename "$post" .md)
     title=$(sed -n 's/^title: *//p' "$post" | head -1)
     date=$(sed -n 's/^date: *//p' "$post" | head -1)
+    description=$(sed -n 's/^description: *//p' "$post" | head -1)
 
     mkdir -p "$DIST/$slug"
     page_start=$(now_ms)
-    pandoc "$post" --template="$post_template" $data_dir $config_flag -o "$DIST/$slug/index.html"
+    pandoc "$post" --template="$post_template" $data_dir $config_flag -M slug="$slug" -M pagetitle="$title" -M pagedescription="$description" -M is_post=true -o "$DIST/$slug/index.html"
     page_time="$(($(now_ms) - page_start))ms"
     sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/$slug/index.html"
     rm -f "$DIST/$slug/index.html.bak"
+
+    generate_og_image "$title" "$description" "$DIST/$slug/og.jpg"
 
     posts_data="$posts_data$date	$slug	$title
 "
@@ -105,10 +133,17 @@ cmd_build() {
   done)
 
   page_start=$(now_ms)
-  echo "$index_list" | pandoc --template="$index_template" $data_dir $config_flag -o "$DIST/index.html"
+  site_title=$(sed -n 's/^site_title: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+  site_description=$(sed -n 's/^site_description: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+  echo "$index_list" | pandoc --template="$index_template" $data_dir $config_flag -M pagetitle="$site_title" -M pagedescription="$site_description" -o "$DIST/index.html"
   page_time="$(($(now_ms) - page_start))ms"
   sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/index.html"
   rm -f "$DIST/index.html.bak"
+
+  # Generate OG images
+  site_title=$(sed -n 's/^site_title: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+  site_description=$(sed -n 's/^site_description: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+  generate_og_image "$site_title" "$site_description" "$DIST/og.jpg"
 
   # Generate Atom feed
   site_url=$(sed -n 's/^site_url: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)

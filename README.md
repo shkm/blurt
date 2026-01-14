@@ -16,6 +16,7 @@ That's it!
 ## Requirements
 
 - **pandoc** - for the actual heavy lifting
+- **ImageMagick** (optional) - for OpenGraph image generation
 - **python3** (optional) - for the dev server (`start` command)
 - **fswatch** (optional) - for instant rebuilds during development
 - **curl** or **wget** (optional) - for self-updating
@@ -50,7 +51,8 @@ That's it!
 ├── templates/
 │   ├── index.html    # Index page template
 │   ├── post.html     # Post page template
-│   └── *.html        # Partials (optional)
+│   ├── social.html   # OpenGraph/social meta tags partial
+│   └── *.html        # Other partials (optional)
 ├── static/           # Static files (copied to dist/)
 ├── posts/            # Markdown posts
 └── dist/             # Generated site
@@ -116,3 +118,12 @@ Optional config for the feed:
 site_title: "My Blog"
 site_author: "Your Name"
 ```
+
+## OpenGraph Images
+
+When ImageMagick is installed, blurt automatically generates OpenGraph images for social sharing. Images are created at:
+
+- `dist/og.jpg` - for the index page
+- `dist/<post>/og.jpg` - for each post
+
+Images use the page title and description (if available) on a subtle gradient background. The `social.html` partial includes all necessary meta tags for OpenGraph and Twitter cards.
