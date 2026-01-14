@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-VERSION="1.2.0"
+VERSION="1.2.1"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
@@ -30,7 +30,7 @@ generate_og_image() {
   description="$2"
   output="$3"
 
-  [ ! command -v magick ] >/dev/null 2>&1 && return
+  command -v magick >/dev/null 2>&1 || return
 
   if [ -n "$description" ]; then
     magick -size 1200x630 gradient:'#ffffff-#c8c8c8' \
