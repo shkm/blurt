@@ -21,6 +21,14 @@ That's it!
 - **fswatch** (optional) - for instant rebuilds during development
 - **curl** or **wget** (optional) - for self-updating
 
+## Docker
+
+A Docker image is available at [shkm/blurt](https://hub.docker.com/r/shkm/blurt):
+
+```bash
+docker run --rm -v $(pwd):/repo shkm/blurt
+```
+
 ## Usage
 
 ```bash
