@@ -134,4 +134,15 @@ When ImageMagick is installed, blurt automatically generates OpenGraph images fo
 - `dist/og.jpg` - for the index page
 - `dist/<post>/og.jpg` - for each post
 
-Images use the page title and description (if available) on a subtle gradient background. The `social.html` partial includes all necessary meta tags for OpenGraph and Twitter cards.
+Images display:
+- Site URL (top-left)
+- Date (top-right, posts only)
+- Title (bottom-left)
+
+The background uses a subtle gradient based on your highlight color. Configure it in `config.yaml`:
+
+```yaml
+og_highlight: "#3b82f6"  # Any hex color
+```
+
+The `social.html` partial includes all necessary meta tags for OpenGraph and Twitter cards.

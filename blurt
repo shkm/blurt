@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-VERSION="1.4.0"
+VERSION="1.5.0"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
@@ -46,25 +46,53 @@ EOF
 
 generate_og_image() {
   title="$1"
-  description="$2"
-  output="$3"
+  site_url="$2"
+  date="$3"
+  highlight="$4"
+  output="$5"
 
   command -v magick >/dev/null 2>&1 || return
 
-  if [ -n "$description" ]; then
-    magick -size 1200x630 gradient:'#ffffff-#c8c8c8' \
-      \( -font "Open-Sans-Bold" -pointsize 64 -fill '#111111' \
-      -size 1000x -background none -gravity center caption:"$title" \) \
-      -gravity center -geometry +0-20 -composite \
-      \( -font "Open-Sans-Regular" -pointsize 22 -fill '#555555' \
-      -size 900x -background none -gravity center caption:"$description" \) \
-      -gravity center -geometry +0+45 -composite \
+  # Strip protocol from URL for display
+  display_url=$(echo "$site_url" | sed 's|https://||; s|http://||')
+
+  # Calculate a very slightly darker shade for almost invisible gradient
+  darker=$(magick xc:"$highlight" -modulate 92 -format '%[hex:p{0,0}]' info: 2>/dev/null || echo "${highlight#\#}")
+
+  if [ -n "$date" ]; then
+    # Format date as "15 January, 2026"
+    formatted_date=$(date -j -f "%Y-%m-%d" "$date" "+%-d %B, %Y" 2>/dev/null || echo "$date")
+
+    # Post page: URL top-left, date top-right, title bottom-left
+    # Use 32-bit depth with subtle noise to prevent gradient banding
+    magick -size 1200x630 -depth 32 -define gradient:direction=SouthWest gradient:"$highlight-#$darker" \
+      -attenuate 0.15 +noise Gaussian \
+      -font "Open-Sans-SemiBold" -pointsize 24 -fill 'rgba(0,0,0,0.15)' \
+      -gravity NorthWest -annotate +61+51 "$display_url" \
+      -font "Open-Sans-SemiBold" -pointsize 24 -fill 'rgba(255,255,255,0.9)' \
+      -gravity NorthWest -annotate +60+50 "$display_url" \
+      -font "Open-Sans-Regular" -pointsize 24 -fill 'rgba(0,0,0,0.15)' \
+      -gravity NorthEast -annotate +59+51 "$formatted_date" \
+      -font "Open-Sans-Regular" -pointsize 24 -fill 'rgba(255,255,255,0.9)' \
+      -gravity NorthEast -annotate +60+50 "$formatted_date" \
+      -font "Open-Sans-Bold" -pointsize 56 -fill 'rgba(0,0,0,0.2)' \
+      -gravity SouthWest -annotate +62+58 "$title" \
+      -font "Open-Sans-Bold" -pointsize 56 -fill '#ffffff' \
+      -gravity SouthWest -annotate +60+60 "$title" \
       -quality 90 "$output" || true
   else
-    magick -size 1200x630 gradient:'#ffffff-#c8c8c8' \
-      \( -font "Open-Sans-Bold" -pointsize 72 -fill '#111111' \
-      -size 1000x -background none -gravity center caption:"$title" \) \
-      -gravity center -composite \
+    # Front page: URL top-left, title bottom-left (no date)
+    # Use 32-bit depth with subtle noise to prevent gradient banding
+    magick -size 1200x630 -depth 32 -define gradient:direction=SouthWest gradient:"$highlight-#$darker" \
+      -attenuate 0.15 +noise Gaussian \
+      -font "Open-Sans-SemiBold" -pointsize 24 -fill 'rgba(0,0,0,0.15)' \
+      -gravity NorthWest -annotate +61+51 "$display_url" \
+      -font "Open-Sans-SemiBold" -pointsize 24 -fill 'rgba(255,255,255,0.9)' \
+      -gravity NorthWest -annotate +60+50 "$display_url" \
+      -font "Open-Sans-Bold" -pointsize 56 -fill 'rgba(0,0,0,0.2)' \
+      -gravity SouthWest -annotate +62+58 "$title" \
+      -font "Open-Sans-Bold" -pointsize 56 -fill '#ffffff' \
+      -gravity SouthWest -annotate +60+60 "$title" \
       -quality 90 "$output" || true
   fi
 }
@@ -114,6 +142,11 @@ cmd_build() {
   config_flag=""
   [ -f "$SCRIPT_DIR/config.yaml" ] && config_flag="--metadata-file=$SCRIPT_DIR/config.yaml"
 
+  # Read config values for OG image generation
+  site_url=$(sed -n 's/^site_url: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+  og_highlight=$(sed -n 's/^og_highlight: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+  [ -z "$og_highlight" ] && og_highlight="#6246ea"
+
   rm -rf "$DIST"
   mkdir -p "$DIST"
 
@@ -138,7 +171,7 @@ cmd_build() {
     sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/$slug/index.html"
     rm -f "$DIST/$slug/index.html.bak"
 
-    generate_og_image "$title" "$description" "$DIST/$slug/og.jpg"
+    generate_og_image "$title" "$site_url" "$date" "$og_highlight" "$DIST/$slug/og.jpg"
 
     posts_data="$posts_data$date	$slug	$title
 "
@@ -159,10 +192,8 @@ cmd_build() {
   sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/index.html"
   rm -f "$DIST/index.html.bak"
 
-  # Generate OG images
-  site_title=$(sed -n 's/^site_title: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
-  site_description=$(sed -n 's/^site_description: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
-  generate_og_image "$site_title" "$site_description" "$DIST/og.jpg"
+  # Generate OG image for homepage (no date)
+  generate_og_image "$site_title" "$site_url" "" "$og_highlight" "$DIST/og.jpg"
   generate_favicon "$site_title" "$DIST/favicon.svg"
 
   # Generate Atom feed
