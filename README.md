@@ -127,6 +127,10 @@ site_title: "My Blog"
 site_author: "Your Name"
 ```
 
+## Favicon
+
+A favicon is automatically generated at `dist/favicon.svg` using your site title initials. It uses the `social_highlight` color as the background and requires the [Open Sans](https://fonts.google.com/specimen/Open+Sans) font.
+
 ## OpenGraph Images
 
 When ImageMagick is installed, blurt automatically generates OpenGraph images for social sharing. Requires the [Open Sans](https://fonts.google.com/specimen/Open+Sans) font to be installed. Images are created at:
@@ -139,10 +143,12 @@ Images display:
 - Date (top-right, posts only)
 - Title (bottom-left)
 
-The background uses a subtle gradient based on your highlight color. Configure it in `config.yaml`:
+## Highlight Color
+
+Both the favicon and OpenGraph images use a configurable highlight color. Set it in `config.yaml`:
 
 ```yaml
-og_highlight: "#3b82f6"  # Any hex color
+social_highlight: "#3b82f6"  # Any hex color
 ```
 
 The `social.html` partial includes all necessary meta tags for OpenGraph and Twitter cards.

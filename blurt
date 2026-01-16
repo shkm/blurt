@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-VERSION="1.5.0"
+VERSION="2.0.0"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIST="$SCRIPT_DIR/dist"
@@ -27,7 +27,8 @@ xml_escape() {
 
 generate_favicon() {
   title="$1"
-  output="$2"
+  highlight="$2"
+  output="$3"
 
   # Extract initials from title (first letter of each word, max 2)
   initials=$(echo "$title" | awk '{
@@ -38,8 +39,9 @@ generate_favicon() {
 
   cat >"$output" <<EOF
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="12" fill="#222"/>
-  <text x="50" y="68" font-family="system-ui, sans-serif" font-size="42" font-weight="bold" fill="#fff" text-anchor="middle">$initials</text>
+  <rect width="100" height="100" rx="12" fill="$highlight"/>
+  <text x="51" y="51" font-family="'Open Sans', sans-serif" font-size="42" font-weight="bold" fill="rgba(0,0,0,0.2)" text-anchor="middle" dominant-baseline="central">$initials</text>
+  <text x="50" y="50" font-family="'Open Sans', sans-serif" font-size="42" font-weight="bold" fill="#fff" text-anchor="middle" dominant-baseline="central">$initials</text>
 </svg>
 EOF
 }
@@ -144,8 +146,8 @@ cmd_build() {
 
   # Read config values for OG image generation
   site_url=$(sed -n 's/^site_url: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
-  og_highlight=$(sed -n 's/^og_highlight: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
-  [ -z "$og_highlight" ] && og_highlight="#6246ea"
+  social_highlight=$(sed -n 's/^social_highlight: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
+  [ -z "$social_highlight" ] && social_highlight="#6246ea"
 
   rm -rf "$DIST"
   mkdir -p "$DIST"
@@ -171,7 +173,7 @@ cmd_build() {
     sed -i.bak "s/__BUILD_TIME__/$page_time/g" "$DIST/$slug/index.html"
     rm -f "$DIST/$slug/index.html.bak"
 
-    generate_og_image "$title" "$site_url" "$date" "$og_highlight" "$DIST/$slug/og.jpg"
+    generate_og_image "$title" "$site_url" "$date" "$social_highlight" "$DIST/$slug/og.jpg"
 
     posts_data="$posts_data$date	$slug	$title
 "
@@ -193,8 +195,8 @@ cmd_build() {
   rm -f "$DIST/index.html.bak"
 
   # Generate OG image for homepage (no date)
-  generate_og_image "$site_title" "$site_url" "" "$og_highlight" "$DIST/og.jpg"
-  generate_favicon "$site_title" "$DIST/favicon.svg"
+  generate_og_image "$site_title" "$site_url" "" "$social_highlight" "$DIST/og.jpg"
+  generate_favicon "$site_title" "$social_highlight" "$DIST/favicon.svg"
 
   # Generate Atom feed
   site_url=$(sed -n 's/^site_url: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$SCRIPT_DIR/config.yaml" 2>/dev/null | head -1)
