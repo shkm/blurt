@@ -4,7 +4,10 @@ You want to write something and share it with the world. But you'd need to set u
 
 Hold up there, sunshine. Blurt's got your back. This is everything you _really_ need to write and publish stuff on the internet.
 
+**Note:** Code was written primarily by AI because I'm not nuts enough to maintain a shell script of this complexity.
+
 ## Quick start
+
 1. [Create a repo from this template](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template#creating-a-repository-from-a-template)
 2. On your repo, go to settings -> Pages -> Source: select GitHub Actions
 3. Clone your repo
@@ -91,7 +94,12 @@ Example usage in a template:
 
 ```html
 <footer>
-  <p>Built in __BUILD_TIME__ · <a href="https://github.com/you/repo/commit/__COMMIT_SHA__">__COMMIT_SHA__</a></p>
+  <p>
+    Built in __BUILD_TIME__ ·
+    <a href="https://github.com/you/repo/commit/__COMMIT_SHA__"
+      >__COMMIT_SHA__</a
+    >
+  </p>
 </footer>
 ```
 
@@ -139,6 +147,7 @@ When ImageMagick is installed, blurt automatically generates OpenGraph images fo
 - `dist/<post>/og.jpg` - for each post
 
 Images display:
+
 - Site URL (top-left)
 - Date (top-right, posts only)
 - Title (bottom-left)
@@ -148,7 +157,7 @@ Images display:
 Both the favicon and OpenGraph images use a configurable highlight color. Set it in `config.yaml`:
 
 ```yaml
-social_highlight: "#3b82f6"  # Any hex color
+social_highlight: "#3b82f6" # Any hex color
 ```
 
 The `social.html` partial includes all necessary meta tags for OpenGraph and Twitter cards.
